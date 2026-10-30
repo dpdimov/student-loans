@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UK Student Loan Simulator</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-0: #f4f3f0;
+    --surface-1: #fcfcfb;
+    --border: #e4e3df;
+    --grid: #ebeae6;
+    --axis: #a3a29c;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #77766f;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --div-neutral: #f0efec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-0: #121211;
+      --surface-1: #1a1a19;
+      --border: #33332f;
+      --grid: #2a2a27;
+      --axis: #6b6a64;
+      --text-primary: #f0efec;
+      --text-secondary: #c3c2b7;
+      --text-muted: #96958c;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --div-neutral: #383835;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --border: #33332f;
+    --grid: #2a2a27;
+    --axis: #6b6a64;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #96958c;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --div-neutral: #383835;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .viz-root {
+    min-height: 100vh;
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 24px;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 0 0 2px; }
+  .sub { color: var(--text-secondary); margin: 0 0 20px; }
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px 22px; }
+  .control label { display: flex; justify-content: space-between; color: var(--text-secondary); font-size: 13px; margin-bottom: 4px; }
+  .control .row { display: flex; gap: 8px; align-items: center; }
+  .control input[type=range] { flex: 1; min-width: 0; }
+  .control input[type=number] {
+    width: 92px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--surface-0); color: var(--text-primary); font: inherit; text-align: right;
+  }
+  .fixed { color: var(--text-muted); font-size: 13px; margin-top: 12px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .tile .k { color: var(--text-secondary); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  .tile .v { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .tile .n { color: var(--text-muted); font-size: 12px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
+  .verdict { font-size: 15px; margin: 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--text-secondary); font-size: 12px; margin: 6px 0 4px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart text { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .chart .end-label { fill: var(--text-secondary); font-size: 12px; }
+  .tooltip {
+    position: absolute; pointer-events: none; display: none; z-index: 2;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.12); padding: 8px 10px; font-size: 12px; min-width: 190px;
+  }
+  .tooltip .t { font-weight: 600; margin-bottom: 4px; }
+  .tooltip .r { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+  .tooltip .r b { margin-left: auto; color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; padding-left: 12px; }
+  details summary { cursor: pointer; color: var(--text-secondary); }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 12.5px; margin-top: 10px; }
+  th, td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--text-secondary); font-weight: 600; position: sticky; top: 0; background: var(--surface-1); }
+  .table-scroll { max-height: 420px; overflow: auto; }
+  .sens { table-layout: fixed; margin-top: 8px; }
+  .sens th, .sens td { text-align: center; padding: 0; border: 0; }
+  .sens thead th { position: static; padding: 4px 2px; font-weight: 500; font-size: 12px; color: var(--text-muted); }
+  .sens tbody th { position: static; text-align: right; padding: 0 8px 0 0; font-weight: 500; font-size: 12px; color: var(--text-muted); width: 64px; }
+  .sens .axis-title { color: var(--text-secondary); font-weight: 600; }
+  .sens td .c {
+    margin: 1px; border-radius: 4px; padding: 6px 2px; cursor: pointer; line-height: 1.2;
+    color: var(--text-primary); outline: 2px solid transparent; outline-offset: -2px;
+  }
+  .sens td .c:hover { outline-color: var(--axis); }
+  .sens td .c.cur { outline-color: var(--text-primary); }
+  .sens td .c b { display: block; font-size: 12.5px; font-weight: 600; }
+  .sens td .c small { display: block; font-size: 10.5px; color: var(--text-secondary); }
+  .sens-wrap { position: relative; overflow-x: auto; }
+  .notes { color: var(--text-muted); font-size: 12.5px; }
+  .notes li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<div class="viz-root">
+<div class="wrap">
+  <h1>UK Student Loan Simulator</h1>
+  <p class="sub">Compare investing the loan amount for 30 years against what you actually repay before the balance is written off.</p>
+
+  <div class="card">
+    <div class="controls" id="controls"></div>
+    <div class="fixed">Repayments: 9% of earnings above the threshold, which rises with inflation · Interest calculated daily, compounded monthly · Term: 30 years, then any balance is written off</div>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="card"><p class="verdict" id="verdict"></p></div>
+
+  <div class="card">
+    <h2>Investing the loan vs. repaying it</h2>
+    <div class="legend" id="legend-1"></div>
+    <div class="chart" id="chart-1"></div>
+  </div>
+
+  <div class="card">
+    <h2>Outstanding loan balance</h2>
+    <div class="legend" id="legend-2"></div>
+    <div class="chart" id="chart-2"></div>
+  </div>
+
+  <div class="card">
+    <h2>When is overpaying worthwhile?</h2>
+    <p class="sub" style="margin:0">Equivalent standard loan as a % of the amount borrowed, by starting salary and salary growth (other inputs as set above). Above 100% — typically when the loan is cleared — the repayments cost more than a standard loan at the same rate, so overpaying to clear it sooner cuts the interest paid. Below 100% — typically when part is written off — overpaying only adds to what you pay. Click a cell to load it.</p>
+    <div class="legend" id="legend-3"></div>
+    <div class="sens-wrap" id="sens"></div>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>Year-by-year table</summary>
+      <div class="table-scroll"><table id="table"></table></div>
+    </details>
+  </div>
+
+  <div class="card notes">
+    <ul>
+      <li>Monthly model: interest is calculated daily on the outstanding balance and added to it at the end of each month; that month's repayment (9% of earnings above the threshold, ÷ 12) is then deducted. Salary rises once a year.</li>
+      <li>"Loan invested" is the full loan amount invested on day one and compounded annually at the investment return.</li>
+      <li>"Equivalent standard loan" is the amount a conventional loan at the loan interest rate (compounded monthly, equal monthly repayments) would have to be for its repayments over the same period — until the loan is cleared, or the full 30 years — to add up to the total actually repaid. It is the present value of the total repaid, spread evenly over that period, discounted at the loan rate; the monthly figure shown is that even instalment (total repaid ÷ number of months).</li>
+      <li>The repayment threshold rises each year with inflation; salary grows at the stated salary growth rate.</li>
+      <li>Overpayment table: each cell reruns the simulation at that starting salary and salary growth, keeping every other input as set above. The small label shows the year the loan is cleared ("yr N") or that a balance is written off ("w/o"); the outlined cell is closest to your current inputs. Hover a cell for the full figures.</li>
+    </ul>
+  </div>
+</div>
+</div>
+
+<script src="simulator.js"></script>
+<script>
+(function () {
+  const { simulate, DEFAULTS } = window.StudentLoan;
+
+  const INPUTS = [
+    { key: "loanAmount", label: "Loan amount", unit: "£", min: 0, max: 150000, step: 500 },
+    { key: "startingSalary", label: "Starting salary", unit: "£", min: 0, max: 150000, step: 500 },
+    { key: "threshold", label: "Starting repayment threshold", unit: "£", min: 0, max: 60000, step: 250 },
+    { key: "salaryGrowth", label: "Salary growth", unit: "%", min: 0, max: 15, step: 0.1 },
+    { key: "inflationRate", label: "Inflation (threshold uprating)", unit: "%", min: 0, max: 15, step: 0.1 },
+    { key: "investmentReturn", label: "Investment return", unit: "%", min: 0, max: 15, step: 0.1 },
+    { key: "interestRate", label: "Loan interest rate", unit: "%", min: 0, max: 15, step: 0.1 },
+  ];
+
+  const state = Object.assign({}, DEFAULTS);
+
+  const gbp = (v) => "£" + Math.round(v).toLocaleString("en-GB");
+  const gbpShort = (v) => {
+    const a = Math.abs(v);
+    if (a >= 1e6) return "£" + (v / 1e6).toFixed(a >= 1e7 ? 0 : 1) + "m";
+    if (a >= 1e3) return "£" + Math.round(v / 1e3) + "k";
+    return "£" + Math.round(v);
+  };
+  const fmtMonths = (n) => n % 12 === 0 ? `${n / 12} years` : `${Math.floor(n / 12)} yr ${n % 12} mo`;
+  const css = (name) => getComputedStyle(document.querySelector(".viz-root")).getPropertyValue(name).trim();
+
+  // ---- Controls ----
+  const controls = document.getElementById("controls");
+  const setters = {};
+  INPUTS.forEach((def) => {
+    const isPct = def.unit === "%";
+    const val = isPct ? +(state[def.key] * 100).toFixed(2) : state[def.key];
+    const el = document.createElement("div");
+    el.className = "control";
+    el.innerHTML = `
+      <label for="n-${def.key}"><span>${def.label}</span><span>${def.unit}</span></label>
+      <div class="row">
+        <input type="range" id="r-${def.key}" min="${def.min}" max="${def.max}" step="${def.step}" value="${val}" aria-label="${def.label}">
+        <input type="number" id="n-${def.key}" min="${def.min}" step="${def.step}" value="${val}">
+      </div>`;
+    controls.appendChild(el);
+    const r = el.querySelector("input[type=range]");
+    const n = el.querySelector("input[type=number]");
+    const set = (v, src) => {
+      if (!isFinite(v) || v < 0) return;
+      state[def.key] = isPct ? v / 100 : v;
+      if (src !== r) r.value = v;
+      if (src !== n) n.value = v;
+      render();
+    };
+    setters[def.key] = (v) => set(isPct ? +(v * 100).toFixed(2) : v, null);
+    r.addEventListener("input", () => set(parseFloat(r.value), r));
+    n.addEventListener("input", () => set(parseFloat(n.value), n));
+  });
+
+  // ---- Line chart with crosshair tooltip ----
+  function lineChart(container, legendEl, years, series) {
+    const W = 1080, H = 340, m = { t: 12, r: 150, b: 30, l: 56 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const maxY = niceMax(Math.max(1, ...series.flatMap((s) => years.map(s.value))));
+    const x = (yr) => m.l + ((yr - 0) / years.length) * iw;
+    const y = (v) => m.t + ih - (v / maxY) * ih;
+
+    legendEl.innerHTML = series.map((s) => `<span><i class="swatch" style="background:${css(s.color)}"></i>${s.name}</span>`).join("");
+
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${series.map((s) => s.name).join(", ")} by year">`;
+    svg += gridY(maxY, y, m.l, W - m.r);
+    svg += axisX(years.length, x, H - m.b + 18);
+    const endYs = [];
+    series.forEach((s) => {
+      const pts = [[x(0), y(s.start)]].concat(years.map((d) => [x(d.year), y(s.value(d))]));
+      svg += `<path d="M${pts.map((p) => p.join(",")).join("L")}" fill="none" stroke="${css(s.color)}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+      endYs.push({ s, y: pts[pts.length - 1][1], v: s.value(years[years.length - 1]) });
+    });
+    // Direct end labels, nudged apart to avoid collisions.
+    endYs.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < endYs.length; i++) if (endYs[i].y - endYs[i - 1].y < 30) endYs[i].y = endYs[i - 1].y + 30;
+    endYs.forEach((e) => {
+      svg += `<text class="end-label" x="${W - m.r + 10}" y="${e.y - 2}">${e.s.short}</text>`;
+      svg += `<text x="${W - m.r + 10}" y="${e.y + 12}">${gbp(e.v)}</text>`;
+    });
+    svg += `<line class="xh" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" stroke="${css("--axis")}" stroke-width="1" visibility="hidden"/>`;
+    svg += series.map((s, i) => `<circle class="dot dot-${i}" r="4.5" fill="${css(s.color)}" stroke="${css("--surface-1")}" stroke-width="2" visibility="hidden"/>`).join("");
+    svg += `<rect class="hit" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/>`;
+    svg += `</svg><div class="tooltip"></div>`;
+    container.innerHTML = svg;
+
+    const svgEl = container.querySelector("svg");
+    const tip = container.querySelector(".tooltip");
+    const xh = svgEl.querySelector(".xh");
+    const hit = svgEl.querySelector(".hit");
+    const move = (ev) => {
+      const pt = svgEl.createSVGPoint();
+      pt.x = ev.clientX; pt.y = ev.clientY;
+      const p = pt.matrixTransform(svgEl.getScreenCTM().inverse());
+      const yr = Math.min(years.length, Math.max(1, Math.round(((p.x - m.l) / iw) * years.length)));
+      const d = years[yr - 1];
+      const cx = x(yr);
+      xh.setAttribute("x1", cx); xh.setAttribute("x2", cx); xh.setAttribute("visibility", "visible");
+      series.forEach((s, i) => {
+        const c = svgEl.querySelector(".dot-" + i);
+        c.setAttribute("cx", cx); c.setAttribute("cy", y(s.value(d))); c.setAttribute("visibility", "visible");
+      });
+      tip.innerHTML = `<div class="t">Year ${yr}</div>` + series.map((s) =>
+        `<div class="r"><i class="swatch" style="background:${css(s.color)}"></i>${s.name}<b>${gbp(s.value(d))}</b></div>`).join("");
+      placeTip(container, tip, ev);
+    };
+    hit.addEventListener("pointermove", move);
+    hit.addEventListener("pointerleave", () => {
+      tip.style.display = "none";
+      xh.setAttribute("visibility", "hidden");
+      svgEl.querySelectorAll(".dot").forEach((c) => c.setAttribute("visibility", "hidden"));
+    });
+  }
+
+  // ---- Bar chart of outstanding balance ----
+  function stackedBars(container, legendEl, years, start, segs) {
+    const W = 1080, H = 300, m = { t: 12, r: 150, b: 30, l: 56 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const total = (d) => segs.reduce((a, s) => a + s.value(d), 0);
+    const maxY = niceMax(Math.max(1, start, ...years.map(total)));
+    const y = (v) => m.t + ih - (v / maxY) * ih;
+    const band = iw / years.length, bw = Math.max(4, band - 4);
+    const bx = (yr) => m.l + (yr - 1) * band + (band - bw) / 2;
+
+    legendEl.innerHTML = segs.length < 2 ? "" : segs.map((s) => `<span><i class="swatch" style="background:${css(s.color)}"></i>${s.name}</span>`).join("");
+
+    let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Outstanding balance by year">`;
+    svg += gridY(maxY, y, m.l, W - m.r);
+    svg += axisX(years.length, (yr) => bx(yr) + bw / 2, H - m.b + 18, true);
+    const surf = css("--surface-1");
+    years.forEach((d) => {
+      let base = 0;
+      const parts = segs.map((s) => ({ s, v: s.value(d) })).filter((p) => p.v > 0.5);
+      parts.forEach((p, i) => {
+        const y0 = y(base), y1 = y(base + p.v);
+        const h = Math.max(0, y0 - y1);
+        const top = i === parts.length - 1;
+        svg += top
+          ? `<path d="${roundTopRect(bx(d.year), y1, bw, h, Math.min(4, h, bw / 2))}" fill="${css(p.s.color)}" stroke="${surf}" stroke-width="1"/>`
+          : `<rect x="${bx(d.year)}" y="${y1}" width="${bw}" height="${h}" fill="${css(p.s.color)}" stroke="${surf}" stroke-width="1"/>`;
+        base += p.v;
+      });
+      svg += `<rect class="bar-hit" data-year="${d.year}" x="${m.l + (d.year - 1) * band}" y="${m.t}" width="${band}" height="${ih}" fill="transparent"/>`;
+    });
+    const last = years[years.length - 1];
+    svg += `<text class="end-label" x="${W - m.r + 10}" y="${y(total(last)) - 2}">${total(last) > 0.5 ? "Written off" : "Repaid"}</text>`;
+    svg += `<text x="${W - m.r + 10}" y="${y(total(last)) + 12}">${gbp(total(last))}</text>`;
+    svg += `</svg><div class="tooltip"></div>`;
+    container.innerHTML = svg;
+
+    const tip = container.querySelector(".tooltip");
+    container.querySelectorAll(".bar-hit").forEach((r) => {
+      r.addEventListener("pointermove", (ev) => {
+        const d = years[+r.dataset.year - 1];
+        tip.innerHTML = `<div class="t">Year ${d.year}</div>` +
+          segs.map((s) => `<div class="r"><i class="swatch" style="background:${css(s.color)}"></i>${s.name}<b>${gbp(s.value(d))}</b></div>`).join("") +
+          `<div class="r">Interest charged<b>${gbp(d.interest)}</b></div>` +
+          `<div class="r">Repaid this year<b>${gbp(d.payment)}</b></div>`;
+        placeTip(container, tip, ev);
+      });
+      r.addEventListener("pointerleave", () => (tip.style.display = "none"));
+    });
+  }
+
+  // ---- Chart helpers ----
+  function niceMax(v) {
+    const p = Math.pow(10, Math.floor(Math.log10(v)));
+    const f = v / p;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+  }
+  function gridY(maxY, y, x0, x1) {
+    let s = "";
+    for (let i = 0; i <= 5; i++) {
+      const v = (maxY / 5) * i, yy = y(v);
+      s += `<line x1="${x0}" x2="${x1}" y1="${yy}" y2="${yy}" stroke="${i === 0 ? css("--axis") : css("--grid")}" stroke-width="1"/>`;
+      s += `<text x="${x0 - 8}" y="${yy + 4}" text-anchor="end">${gbpShort(v)}</text>`;
+    }
+    return s;
+  }
+  function axisX(n, x, ty, skipZero) {
+    let s = "";
+    for (let yr = skipZero ? 1 : 0; yr <= n; yr++) {
+      if (yr % 5 !== 0 && !(skipZero && yr === 1)) continue;
+      s += `<text x="${x(yr)}" y="${ty}" text-anchor="middle">${yr === 0 ? "Start" : "Yr " + yr}</text>`;
+    }
+    return s;
+  }
+  function roundTopRect(x, y, w, h, r) {
+    return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+  }
+  function placeTip(container, tip, ev) {
+    const rect = container.getBoundingClientRect();
+    tip.style.display = "block";
+    let left = ev.clientX - rect.left + 14;
+    if (left + tip.offsetWidth > rect.width) left = ev.clientX - rect.left - tip.offsetWidth - 14;
+    tip.style.left = left + "px";
+    tip.style.top = Math.max(0, ev.clientY - rect.top - tip.offsetHeight / 2) + "px";
+  }
+
+  // ---- Sensitivity grid: starting salary × salary growth ----
+  const SENS_SALARIES = Array.from({ length: 13 }, (_, i) => 20000 + i * 5000);
+  const SENS_GROWTHS = Array.from({ length: 13 }, (_, i) => i * 0.005);
+
+  function sensitivity(container, legendEl) {
+    const nearest = (arr, v) => arr.reduce((b, a) => Math.abs(a - v) < Math.abs(b - v) ? a : b);
+    const curS = nearest(SENS_SALARIES, state.startingSalary);
+    const curG = nearest(SENS_GROWTHS, state.salaryGrowth);
+    const pos = css("--series-1"), neg = css("--series-2"), mid = css("--div-neutral");
+    // Shade by distance from 100%, saturating at ±40 points.
+    const fill = (ratio) => {
+      const t = Math.min(1, Math.abs(ratio - 1) / 0.4);
+      return `color-mix(in oklab, ${ratio >= 1 ? pos : neg} ${Math.round(t * 55)}%, ${mid})`;
+    };
+    const pct = (v) => (v * 100).toFixed(v * 100 % 1 ? 1 : 0) + "%";
+
+    legendEl.innerHTML =
+      `<span><i class="swatch" style="background:${fill(1.4)}"></i>Above 100%: overpaying saves interest</span>` +
+      `<span><i class="swatch" style="background:${fill(0.6)}"></i>Below 100%: don't overpay</span>`;
+
+    let html = `<table class="sens"><thead><tr><th></th><th class="axis-title" colspan="${SENS_GROWTHS.length}">Salary growth a year →</th></tr>` +
+      `<tr><th class="axis-title" style="text-align:right;padding-right:8px">Salary ↓</th>` +
+      SENS_GROWTHS.map((g) => `<th>${pct(g)}</th>`).join("") + `</tr></thead><tbody>`;
+    SENS_SALARIES.forEach((sal) => {
+      html += `<tr><th>${gbpShort(sal)}</th>`;
+      SENS_GROWTHS.forEach((g) => {
+        const r = simulate(Object.assign({}, state, { startingSalary: sal, salaryGrowth: g }));
+        const ratio = state.loanAmount > 0 ? r.equivalentLoan / state.loanAmount : 0;
+        const title = `Starting salary ${gbp(sal)}, growth ${pct(g)}: equivalent loan ${gbp(r.equivalentLoan)} ` +
+          `(${Math.round(ratio * 100)}% of ${gbp(state.loanAmount)}), total repaid ${gbp(r.totalRepaid)}, ` +
+          (r.repaidInYear ? `cleared in year ${r.repaidInYear}` : `${gbp(r.writtenOff)} written off`) +
+          ` — ${ratio > 1 ? "overpaying saves interest" : "overpaying not worthwhile"}`;
+        const cur = sal === curS && g === curG ? " cur" : "";
+        html += `<td><div class="c${cur}" style="background:${fill(ratio)}" data-s="${sal}" data-g="${g}" title="${title}">` +
+          `<b>${Math.round(ratio * 100)}%</b><small>${r.repaidInYear ? "yr " + r.repaidInYear : "w/o"}</small></div></td>`;
+      });
+      html += `</tr>`;
+    });
+    container.innerHTML = html + `</tbody></table>`;
+    container.querySelectorAll(".c").forEach((el) => el.addEventListener("click", () => {
+      setters.salaryGrowth(+el.dataset.g);
+      setters.startingSalary(+el.dataset.s);
+    }));
+  }
+
+  // ---- Render ----
+  function render() {
+    const res = simulate(state);
+    const { years } = res;
+
+    const tile = (k, v, n, color) => `<div class="tile"><div class="k">${color ? `<i class="swatch" style="background:${css(color)}"></i>` : ""}${k}</div><div class="v">${v}</div><div class="n">${n}</div></div>`;
+    document.getElementById("tiles").innerHTML =
+      tile("Loan invested at year 30", gbp(res.investmentValue), `${gbp(state.loanAmount)} at ${(state.investmentReturn * 100).toFixed(1)}% a year`, "--series-1") +
+      tile("Total repaid", gbp(res.totalRepaid), `total interest charged ${gbp(res.totalInterest)}`, "--series-2") +
+      tile(res.repaidInYear ? "Loan cleared" : "Written off at year 30",
+           res.repaidInYear ? `Year ${res.repaidInYear}` : gbp(res.writtenOff),
+           res.repaidInYear ? "nothing written off" : "balance remaining after 30 years") +
+      tile("Equivalent standard loan", gbp(res.equivalentLoan),
+           `${gbp(res.equivalentMonthlyPayment)}/month at ${(state.interestRate * 100).toFixed(1)}% over ${fmtMonths(res.monthsActive)}, totalling ${gbp(res.totalRepaid)}`) +
+      tile("Investing advantage", (res.netAdvantage < 0 ? "−" : "") + gbp(Math.abs(res.netAdvantage)), "loan invested − total repaid");
+
+    const ahead = res.netAdvantage >= 0;
+    document.getElementById("verdict").innerHTML = ahead
+      ? `The invested loan grows to ${gbp(res.investmentValue)} — <b>${gbp(res.netAdvantage)}</b> more than the ${gbp(res.totalRepaid)} repaid over the term.`
+      : `Total repayments of ${gbp(res.totalRepaid)} exceed the invested loan (${gbp(res.investmentValue)}) by <b>${gbp(-res.netAdvantage)}</b>.`;
+
+    lineChart(document.getElementById("chart-1"), document.getElementById("legend-1"), years, [
+      { name: "Loan invested", short: "Loan invested", color: "--series-1", start: state.loanAmount, value: (d) => d.investmentValue },
+      { name: "Cumulative repayments", short: "Total repaid", color: "--series-2", start: 0, value: (d) => d.totalRepaid },
+    ]);
+
+    stackedBars(document.getElementById("chart-2"), document.getElementById("legend-2"), years, state.loanAmount, [
+      { name: "Balance owed", color: "--series-1", value: (d) => d.balance },
+    ]);
+
+    sensitivity(document.getElementById("sens"), document.getElementById("legend-3"));
+
+    const cols = [
+      ["Year", (d) => d.year],
+      ["Salary", (d) => gbp(d.salary)],
+      ["Threshold", (d) => gbp(d.threshold)],
+      ["Interest charged", (d) => gbp(d.interest)],
+      ["Repayment", (d) => gbp(d.payment)],
+      ["Balance (year end)", (d) => gbp(d.balance)],
+      ["Total repaid", (d) => gbp(d.totalRepaid)],
+      ["Loan invested", (d) => gbp(d.investmentValue)],
+    ];
+    document.getElementById("table").innerHTML =
+      `<thead><tr>${cols.map((c) => `<th>${c[0]}</th>`).join("")}</tr></thead><tbody>` +
+      years.map((d) => `<tr>${cols.map((c) => `<td>${c[1](d)}</td>`).join("")}</tr>`).join("") + "</tbody>";
+  }
+
+  render();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);
+})();
+</script>
+</body>
+</html>
