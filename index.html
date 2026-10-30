@@ -105,10 +105,11 @@
   th, td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
   th { color: var(--text-secondary); font-weight: 600; position: sticky; top: 0; background: var(--surface-1); }
   .table-scroll { max-height: 420px; overflow: auto; }
-  .sens { table-layout: fixed; margin-top: 8px; }
+  .sens { table-layout: fixed; margin-top: 8px; min-width: 760px; }
   .sens th, .sens td { text-align: center; padding: 0; border: 0; }
   .sens thead th { position: static; padding: 4px 2px; font-weight: 500; font-size: 12px; color: var(--text-muted); }
-  .sens tbody th { position: static; text-align: right; padding: 0 8px 0 0; font-weight: 500; font-size: 12px; color: var(--text-muted); width: 64px; }
+  .sens tbody th, .sens thead tr:last-child th:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface-1); }
+  .sens tbody th { text-align: right; padding: 0 8px 0 0; font-weight: 500; font-size: 12px; color: var(--text-muted); width: 64px; }
   .sens .axis-title { color: var(--text-secondary); font-weight: 600; }
   .sens td .c {
     margin: 1px; border-radius: 4px; padding: 6px 2px; cursor: pointer; line-height: 1.2;
