@@ -120,6 +120,13 @@
   .sens td .c b { display: block; font-size: 12.5px; font-weight: 600; }
   .sens td .c small { display: block; font-size: 10.5px; color: var(--text-secondary); }
   .sens-wrap { position: relative; overflow-x: auto; }
+  .sens-card { position: relative; }
+  .sens-tip { pointer-events: auto; min-width: 230px; max-width: calc(100% - 16px); }
+  .sens-tip .v { margin-top: 6px; color: var(--text-primary); font-weight: 600; }
+  .sens-tip button {
+    margin-top: 8px; width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--surface-0); color: var(--text-primary); font: inherit; font-weight: 600; cursor: pointer;
+  }
   .notes { color: var(--text-muted); font-size: 12.5px; }
   .notes li { margin-bottom: 4px; }
 </style>
@@ -151,11 +158,12 @@
     <div class="chart" id="chart-2"></div>
   </div>
 
-  <div class="card">
+  <div class="card sens-card">
     <h2>When is overpaying worthwhile?</h2>
-    <p class="sub" style="margin:0">Equivalent standard loan as a % of the amount borrowed, by starting salary and salary growth (other inputs as set above). Above 100% — typically when the loan is cleared — the repayments cost more than a standard loan at the same rate, so overpaying to clear it sooner cuts the interest paid. Below 100% — typically when part is written off — overpaying only adds to what you pay. Click a cell to load it.</p>
+    <p class="sub" style="margin:0">Equivalent standard loan as a % of the amount borrowed, by starting salary and salary growth (other inputs as set above). Above 100% — typically when the loan is cleared — the repayments cost more than a standard loan at the same rate, so overpaying to clear it sooner cuts the interest paid. Below 100% — typically when part is written off — overpaying only adds to what you pay. Click a cell to load it into the inputs above; on a touchscreen, tap a cell for its details.</p>
     <div class="legend" id="legend-3"></div>
     <div class="sens-wrap" id="sens"></div>
+    <div class="tooltip sens-tip" id="sens-tip" role="dialog" aria-label="Cell details"></div>
   </div>
 
   <div class="card">
@@ -171,7 +179,7 @@
       <li>"Loan invested" is the full loan amount invested on day one and compounded annually at the investment return.</li>
       <li>"Equivalent standard loan" is the amount a conventional loan at the loan interest rate (compounded monthly, equal monthly repayments) would have to be for its repayments over the same period — until the loan is cleared, or the full 30 years — to add up to the total actually repaid. It is the present value of the total repaid, spread evenly over that period, discounted at the loan rate; the monthly figure shown is that even instalment (total repaid ÷ number of months).</li>
       <li>The repayment threshold rises each year with inflation; salary grows at the stated salary growth rate.</li>
-      <li>Overpayment table: each cell reruns the simulation at that starting salary and salary growth, keeping every other input as set above. The small label shows the year the loan is cleared ("yr N") or that a balance is written off ("w/o"); the outlined cell is closest to your current inputs. Hover a cell for the full figures.</li>
+      <li>Overpayment table: each cell reruns the simulation at that starting salary and salary growth, keeping every other input as set above. The small label shows the year the loan is cleared ("yr N") or that a balance is written off ("w/o"); the outlined cell is closest to your current inputs. Hover over a cell (or tap it on a touchscreen) for the full figures.</li>
     </ul>
   </div>
 </div>
@@ -393,6 +401,7 @@
       return `color-mix(in oklab, ${ratio >= 1 ? pos : neg} ${Math.round(t * 55)}%, ${mid})`;
     };
     const pct = (v) => (v * 100).toFixed(v * 100 % 1 ? 1 : 0) + "%";
+    const cells = [];
 
     legendEl.innerHTML =
       `<span><i class="swatch" style="background:${fill(1.4)}"></i>Above 100%: overpaying saves interest</span>` +
@@ -411,17 +420,54 @@
           (r.repaidInYear ? `cleared in year ${r.repaidInYear}` : `${gbp(r.writtenOff)} written off`) +
           ` — ${ratio > 1 ? "overpaying saves interest" : "overpaying not worthwhile"}`;
         const cur = sal === curS && g === curG ? " cur" : "";
-        html += `<td><div class="c${cur}" style="background:${fill(ratio)}" data-s="${sal}" data-g="${g}" title="${title}">` +
+        cells.push({ sal, g, r, ratio });
+        html += `<td><div class="c${cur}" style="background:${fill(ratio)}" data-i="${cells.length - 1}" title="${title}">` +
           `<b>${Math.round(ratio * 100)}%</b><small>${r.repaidInYear ? "yr " + r.repaidInYear : "w/o"}</small></div></td>`;
       });
       html += `</tr>`;
     });
     container.innerHTML = html + `</tbody></table>`;
-    container.querySelectorAll(".c").forEach((el) => el.addEventListener("click", () => {
-      setters.salaryGrowth(+el.dataset.g);
-      setters.startingSalary(+el.dataset.s);
+    hideSensTip();
+    container.querySelectorAll(".c").forEach((el) => el.addEventListener("click", (ev) => {
+      const d = cells[+el.dataset.i];
+      // No hover on touchscreens, so a tap shows the details first; elsewhere a click loads the cell.
+      if (matchMedia("(hover: none)").matches) showSensTip(el, d, pct);
+      else loadCell(d);
+      ev.stopPropagation();
     }));
   }
+
+  const sensTip = document.getElementById("sens-tip");
+  function loadCell(d) {
+    setters.salaryGrowth(d.g);
+    setters.startingSalary(d.sal);
+  }
+  function hideSensTip() { sensTip.style.display = "none"; }
+  function showSensTip(el, d, pct) {
+    const { r, ratio } = d;
+    const row = (k, v) => `<div class="r">${k}<b>${v}</b></div>`;
+    sensTip.innerHTML =
+      `<div class="t">${gbp(d.sal)} salary, ${pct(d.g)} growth</div>` +
+      row("Equivalent loan", gbp(r.equivalentLoan)) +
+      row("Share of amount borrowed", Math.round(ratio * 100) + "%") +
+      row("Total repaid", gbp(r.totalRepaid)) +
+      (r.repaidInYear ? row("Loan cleared", "Year " + r.repaidInYear) : row("Written off at year 30", gbp(r.writtenOff))) +
+      `<div class="v">${ratio > 1 ? "Overpaying saves interest" : "Overpaying not worthwhile"}</div>` +
+      `<button type="button">Use these inputs</button>`;
+    sensTip.querySelector("button").addEventListener("click", () => loadCell(d));
+    // Position below the cell (above if there's no room), kept inside the card.
+    const card = sensTip.parentElement.getBoundingClientRect();
+    const cell = el.getBoundingClientRect();
+    sensTip.style.display = "block";
+    const w = sensTip.offsetWidth, h = sensTip.offsetHeight;
+    const left = Math.min(Math.max(8, cell.left - card.left + cell.width / 2 - w / 2), card.width - w - 8);
+    const below = cell.bottom - card.top + 6;
+    const top = below + h > card.height && cell.top - card.top - h - 6 >= 0 ? cell.top - card.top - h - 6 : below;
+    sensTip.style.left = left + "px";
+    sensTip.style.top = top + "px";
+  }
+  document.addEventListener("click", (ev) => { if (!sensTip.contains(ev.target)) hideSensTip(); });
+  document.getElementById("sens").addEventListener("scroll", hideSensTip);
 
   // ---- Render ----
   function render() {
